@@ -181,7 +181,7 @@ class LM(object):
 
         # We need this as a batch in order to collect activations.
         input_tokenized_info = self.tokenizer(input_str, return_tensors="pt")
-        input_ids, attention_mask = input_tokenized_info['input_ids'], input_tokenized_info['attention_mask']
+        input_ids, attention_mask = self.to(input_tokenized_info['input_ids']), self.to(input_tokenized_info['attention_mask'])
         n_input_tokens = len(input_ids[0])
         cur_len = n_input_tokens
 
@@ -279,7 +279,7 @@ class LM(object):
                 assert len(decoder_input_ids.size()) == 2 # will break otherwise
                 decoder_input_ids = torch.cat([decoder_input_ids, torch.tensor([[prediction_id]])], dim=-1)
             else:
-                input_ids = torch.cat([input_ids, torch.tensor([[prediction_id]])], dim=-1)
+                input_ids = torch.cat([input_ids, self.to(torch.tensor([[prediction_id]]))], dim=-1)
 
                 # Recomputing Attention Mask
                 if getattr(self.model, '_prepare_attention_mask_for_generation'):
@@ -624,7 +624,6 @@ class LM(object):
                     parentDiv: '{viz_id}',
                     data: {json.dumps(data)},
                     tokenization_config: {json.dumps(self.model_config['tokenizer_config'])}
-            
             }})
          }}, function (err) {{
             console.log(err);
@@ -720,11 +719,13 @@ def sample_output_token(scores, do_sample, temperature, top_k, top_p):
 
 
 def _one_hot(token_ids, vocab_size):
-    return torch.zeros(len(token_ids), vocab_size).scatter_(1, token_ids.unsqueeze(1), 1.)
+    device = token_ids.device
+    return torch.zeros(len(token_ids), vocab_size, device=device).scatter_(1, token_ids.unsqueeze(1), 1.)
 
 def _one_hot_batched(token_ids, vocab_size):
     batch_size, num_tokens = token_ids.shape
-    return torch.zeros(batch_size, num_tokens, vocab_size).scatter_(-1, token_ids.unsqueeze(-1), 1.)
+    device = token_ids.device
+    return torch.zeros(batch_size, num_tokens, vocab_size, device=device).scatter_(-1, token_ids.unsqueeze(-1), 1.)
 
 
 def activations_dict_to_array(activations_dict):
